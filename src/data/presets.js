@@ -136,6 +136,11 @@ FL.DEFAULTS = {
   flamView: false,     // parçaları yanıcılık rengiyle göster
   flamMode: 'class',   // 'class' modelin sınıfı | 'atm' bu atmosferde (O₂ ve LOI)
   roomLight: 0,        // lx, tavan lambasının döşemede verdiği aydınlık (0: kapalı)
+  // Işık tarzı (render/lighting.js): 'auto' mekikte yörünge güneşi, nesnelerde stüdyo, yalnız alevde klasik
+  lightStyle: 'auto',
+  lightGain: 1,        // tarzın bütün ışıklarını ölçekler
+  sunAz: 125,          // derece, güneşin azimutu (0° = +x, 90° = +z)
+  sunEl: 32,           // derece, güneşin yüksekliği
   // Yangın ve patlama efektleri
   fxTool: 'none',      // sahneye tıklayınca: 'none' | 'spark' kıvılcım | 'charge' patlayıcı | 'agent' söndürücü
   fxYield: 0.05,       // MJ, patlayıcının enerjisi
@@ -356,7 +361,7 @@ FL.VIEW_PREFS = ['view', 'exposure', 'autoExposure', 'chemGain', 'sootGain', 'bl
   'camPhys', 'camSensor', 'camFocal', 'camFstop', 'camShutter', 'camISO', 'camAE', 'camEV', 'camFocus', 'camWB', 'camNoise', 'camVig', 'camGlare', 'camView', 'camHelpers', 'camLook', 'camSet', 'camX', 'camY', 'camZ', 'camYaw', 'camPitch', 'camRoll', 'camGizmo',
   'dsFrames', 'dsInterval', 'dsWidth', 'dsJitter', 'dsMask',
   'pressureIters', 'viscIters', 'maxSub', 'timeScale', 'slice', 'sliceField', 'sliceAxis', 'slicePos', 'autoRotate',
-  'model', 'modelX', 'modelZ', 'modelRot', 'modelSolid', 'flamView', 'flamMode', 'roomLight',
+  'model', 'modelX', 'modelZ', 'modelRot', 'modelSolid', 'flamView', 'flamMode', 'roomLight', 'lightStyle', 'lightGain', 'sunAz', 'sunEl',
   'fxTool', 'fxYield', 'fxO2Link', 'backdrop', 'earthLum', 'sunLight', 'targetFps', 'realTime'];
 
 /** Bir durumu senaryoya göre üret */

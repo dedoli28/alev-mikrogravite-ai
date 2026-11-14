@@ -508,18 +508,24 @@ class Renderer {
     const large = mOn && ms.def.large;
     // Uzay arka planı: Dünya ve yıldızlar ayrı, küçük bir geçişte (aynı kamera ve kayma)
     const orbit = this.orbitBackdrop(st);
-    const sunDir = FL.SUN_DIR;
-    const sunE = orbit ? Math.max(st.sunLight || 0, 0) : 0;
+    // Işık tarzı: ortam, lamba, güneş ve dolgu birlikte (render/lighting.js)
+    const rig = FL.lightRig(st, { model: mOn, large: !!large, orbit });
+    this.rig = rig;
+    const sunDir = rig.sunDir;
+    const sunE = rig.sunE;
     const bgOn = orbit && view === 0 && !maskPass;
     if (bgOn) {
+      // Güneş diski: Dünya'nın gündüz yüzünden çok daha parlak (doyuma gider, hale verir)
+      const dl = rig.sunDisc ? Math.max(st.earthLum || 0, 60) * 260 : 0;
       g.pass(this.P.backdrop, this.bgT, {
+        uSunDisc: [rig.sunCol[0] * dl, rig.sunCol[1] * dl, rig.sunCol[2] * dl, rig.sunDisc],
         uInvVP: cam.invVP, uJitter: jitter, uSunDir: sunDir, uSpaceL: st.earthLum || 0,
         uSpaceT: sim.simTime + (fxs ? fxs.time : 0),
       });
     }
     // Tavan lambası: hedef noktada (masa ya da kabin döşemesi) istenen aydınlığı verecek ışık şiddeti
     let key = [0, 0, 0, 0], keyR = 0.1;
-    if (st.roomLight > 0) {
+    if (rig.keyLx > 0) {
       let P, aim;
       if (mOn && ms.def.lamp) {
         P = M4.transformPoint(ms.M, ms.def.lamp);
@@ -535,7 +541,7 @@ class Renderer {
         keyR = 0.12 * S;
       }
       const d2 = (P[0] - aim[0]) ** 2 + (P[1] - aim[1]) ** 2 + (P[2] - aim[2]) ** 2;
-      key = [P[0], P[1], P[2], st.roomLight * d2];
+      key = [P[0], P[1], P[2], rig.keyLx * d2];
     }
     this.keyLight = key;
     const aiOn = view === 9 && !!FL.AIView;
@@ -543,6 +549,9 @@ class Renderer {
     const base = Object.assign({}, sim.commonU(), sim.thermoU(), ms.uniforms(mOn, (!!st.flamView && !maskPass && !phys) || (aiOn && FL.AIView.painted(ms))), {
       uAiOrg: aiU.org, uAiPar: aiU.par, uAiPx: aiU.px,
       uBackdrop: bgOn ? 1 : 0, uBgTex: this.bgT, uSunDir: sunDir, uSunE: sunE, uFxNit: FL.FX_FLAME_NIT * 0.6,
+      uKeyCol: rig.keyCol, uAmbSky: rig.sky, uAmbGnd: rig.gnd, uSunCol: rig.sunCol, uFill: rig.fill, uFillCol: rig.fillCol,
+      // Güneş gölge ışınının boyu: model ya da deney kutusunun ölçeği
+      uSunReach: mOn ? 1.2 * Math.max(ms.worldHi[0] - ms.worldLo[0], ms.worldHi[1] - ms.worldLo[1], ms.worldHi[2] - ms.worldLo[2], 0.2) : 4 * Math.max(gr.Lx, gr.Ly, gr.Lz),
       uExpTot: view === 0 ? exposureMul : 1,
       uFloorFade: floorFade,
       uKey: key, uKeyR: keyR,
@@ -562,7 +571,7 @@ class Renderer {
       uLight: [LU.pos[0], LU.pos[1], LU.pos[2], LU.cd],
       uLightCol: LU.col,
       uLightR: LU.R,
-      uAmbientL: st.ambientLight,
+      uAmbientL: rig.amb,
       uSlice: [st.slice ? 1 : 0, sf, SLICE_AXIS[st.sliceAxis] || 2, st.slicePos],
       uSliceRange: sliceRange,
       uSliceGain: 0.6 / Math.max(exposureMul, 1e-12),
@@ -612,7 +621,7 @@ class Renderer {
       fxSch = fxView === 7 ? 1 : 0;
       color = this.fx.render({
         sys: fxs, color, aux: this.aux, cam, w: rw, h: rh, view: fxView, preExp, velRange: st.falseU / 100,
-        key, light: LU, sun: [sunDir[0], sunDir[1], sunDir[2], sunE], ambL: st.ambientLight,
+        key, light: LU, sun: [sunDir[0], sunDir[1], sunDir[2], sunE], ambL: rig.amb,
         heatRange: [st.Tamb, st.falseTmax], floor: st.floor && !large && !orbit,
       });
     }
@@ -803,5 +812,4 @@ const SLICE_FIELD = { T: 0, hrr: 1, soot: 2, vel: 3, fuel: 4, o2: 5, div: 6, pro
 const SLICE_AXIS = { x: 0, y: 1, z: 2 };
 FL.VIEW_CODE = VIEW_CODE;
 /** Güneş yönü (yörünge arka planı, model yüzeyleri, duman) */
-FL.SUN_DIR = (() => { const v = [0.5, 0.72, 0.62]; const l = Math.hypot(v[0], v[1], v[2]); return v.map((x) => x / l); })();
 FL.Renderer = Renderer;

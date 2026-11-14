@@ -113,7 +113,16 @@ uniform float uMFlam;            // yanıcılık görünümü
 uniform float uExpTot;           // toplam pozlama çarpanı (pozlamadan bağımsız renkler için)
 uniform vec4 uKey;               // tavan lambası: konum + ışık şiddeti [cd] (0: kapalı)
 uniform float uKeyR;             // lamba yarıçapı [m]
-const vec3 KEY_COL = vec3(1.0, 0.96, 0.9);   // ~4000 K beyaz LED
+// Işık tarzı (FL.lightRig): renkli yarım küre ortam ışığı, lamba rengi, gölgeli güneş, gölgesiz dolgu
+uniform vec3 uKeyCol;            // lamba rengi
+#define KEY_COL uKeyCol
+uniform vec3 uAmbSky;            // yukarı bakan yüzeye gelen ortam ışıklılığı [cd/m²]
+uniform vec3 uAmbGnd;            // aşağı bakan yüzeye gelen
+uniform vec3 uSunCol;            // güneş (paralel ışık) rengi
+uniform float uSunReach;         // güneş gölge ışınının boyu [m] (sahne ölçeği)
+uniform vec4 uFill;              // dolgu ışığı: yön + aydınlık [lx]
+uniform vec3 uFillCol;
+vec3 ambCol(vec3 n) { return mix(uAmbGnd, uAmbSky, 0.5 + 0.5 * n.y); }
 // Yangın efektleri ve uzay arka planı. Pahalı kısımlar bu gölgelendiricide değildir (derleme süresi):
 // yanık izi model G-tamponunda (uGB1.yzw), Dünya ve yıldızlar ayrı bir geçişte (uBgTex) hesaplanır.
 uniform float uFxNit;            // kor ışıması ölçeği [cd/m²]
@@ -365,8 +374,7 @@ vec3 envSpec(vec3 n, vec3 V, vec3 F0, float rough, float ao) {
   float ndv = max(dot(n, V), 0.0);
   vec3 F = F0 + (max(vec3(1.0 - rough), F0) - F0) * pow(1.0 - ndv, 5.0);
   // Deney odasının loş tavan/duvar yansıması: yukarı bakan yüzeyler daha aydınlık
-  float sky = 0.55 + 0.45 * reflect(-V, n).y;
-  return F * uAmbientL * sky * ao * 0.9;
+  return F * ambCol(reflect(-V, n)) * ao * 0.9;
 }
 
 // ------------------------------------------------------------------
@@ -388,8 +396,7 @@ vec3 shadeSolid(vec3 p, vec3 rd, float mat) {
   float sh = uLight.w > 0.0 ? (mat == 5.0 ? 1.0 : softShadow(p + n * 0.00025, L, dist)) : 0.0;
   float ao = calcAO(p, n);
   vec3 lightRGB = uLightCol * E * sh;
-  float hemi = 0.6 + 0.4 * n.y;
-  vec3 amb = vec3(uAmbientL) * ao * hemi;
+  vec3 amb = ambCol(n) * ao;
   vec3 cell = toCell(p + n * uDx * 1.2);
   float Tloc = S(uSca, cell).r;
   vec3 col = vec3(0.0);
@@ -438,7 +445,7 @@ vec3 shadeSolid(vec3 p, vec3 rd, float mat) {
     float fres = 0.035 + 0.965 * pow(1.0 - ndv, 5.0);
     col = brdf(n, V, L, vec3(0.0), 0.03, F0, 0.0, aw) * lightRGB;
     col += vec3(0.85, 0.9, 1.0) * uLightCol * E * 0.05 * max(dot(-n, L), 0.0);
-    col += fres * vec3(uAmbientL) * 0.9 + vec3(0.015) * uAmbientL;
+    col += fres * ambCol(reflect(-V, n)) * 0.9 + 0.015 * ambCol(n);
   } else if (mat == 5.0) {
     // Katı yakıt levhası: yanma ilerledikçe kömürleşme ve akkor piroliz cephesi
     ivec3 cc = ivec3(floor(p / uDx));
@@ -489,10 +496,16 @@ vec3 shadeFloor(vec3 p, vec3 rd) {
     alb = mix(alb, vec3(0.13, 0.14, 0.16), line * 0.55);
   }
   float aw = clamp(uLightR / (2.0 * dist), 0.0, 0.8);
-  vec3 col = brdf(n, -rd, L, alb, 0.55, vec3(0.035), 0.0, aw) * uLightCol * E * sh + alb * uAmbientL * ao;
+  vec3 col = brdf(n, -rd, L, alb, 0.55, vec3(0.035), 0.0, aw) * uLightCol * E * sh + alb * ambCol(n) * ao;
   vec3 Lk; float awk;
-  float Ek = keyLight(p, n, 0.0006 + (uMOn > 0.5 ? 0.6 * uMGd : 0.0), Lk, awk);
+  float foff = 0.0006 + (uMOn > 0.5 ? 0.6 * uMGd : 0.0);
+  float Ek = keyLight(p, n, foff, Lk, awk);
   if (Ek > 0.0) col += brdf(n, -rd, Lk, alb, 0.55, vec3(0.035), 0.0, awk) * KEY_COL * Ek;
+  if (uSunE > 0.0 && uSunDir.y > 0.0) {
+    float ss = softShadowR(p + n * foff, uSunDir, uSunReach, foff * 1.4 + 0.0004, uSunReach * 0.025);
+    col += brdf(n, -rd, uSunDir, alb, 0.55, vec3(0.035), 0.0, 0.01) * uSunCol * uSunE * ss;
+  }
+  if (uFill.w > 0.0) col += brdf(n, -rd, uFill.xyz, alb, 0.55, vec3(0.035), 0.0, 0.1) * uFillCol * uFill.w * ao;
   float fade = exp(-length(p.xz - uBox.xz * 0.5) / uFloorFade);
   return col * fade;
 }
@@ -551,8 +564,7 @@ vec3 shadeMesh(vec3 p, vec3 n, vec3 rd, int pid, vec3 burn, out bool flatOut) {
   float aw = clamp(uLightR / (2.0 * dist), 0.0, 0.8);
   float sh = uLight.w > 0.0 && dot(n, L) > 0.0 ? softShadow(p + n * (0.6 * vox + 0.0003), L, dist, 0.8 * vox) : 0.0;
   vec3 lightRGB = uLightCol * E * sh;
-  float hemi = 0.6 + 0.4 * n.y;
-  vec3 amb = vec3(uAmbientL) * ao * hemi;
+  vec3 amb = ambCol(n) * ao;
   vec3 col;
   if (glass) {
     col = brdf(n, V, L, vec3(0.0), rough, F0, 0.0, aw) * lightRGB + envSpec(n, V, F0, rough, ao) + alb * amb;
@@ -564,7 +576,13 @@ vec3 shadeMesh(vec3 p, vec3 n, vec3 rd, int pid, vec3 burn, out bool flatOut) {
   if (Ek > 0.0) col += brdf(n, V, Lk, glass ? vec3(0.0) : alb, rough, F0, glass ? 0.0 : metal, awk) * KEY_COL * Ek;
   // Güneş (yörünge arka planı): paralel ışık. Ayrı bir gölge ışını yürütülmez (gölgelendiricinin
   // derleme süresi); ortam kapatma girintileri karartır.
-  if (uSunE > 0.0) col += brdf(n, V, uSunDir, glass ? vec3(0.0) : alb, rough, F0, glass ? 0.0 : metal, 0.01) * vec3(1.0, 0.96, 0.9) * uSunE * ao;
+  if (uSunE > 0.0 && dot(n, uSunDir) > 0.0) {
+    // Gölge ışını model uzaklık alanında yürür: güneş camlardan (uzaklık alanında yoklar) içeri girer
+    float ss = softShadowR(p + n * (0.6 * vox + 0.0003), uSunDir, uSunReach, 0.8 * vox, uSunReach * 0.025);
+    col += brdf(n, V, uSunDir, glass ? vec3(0.0) : alb, rough, F0, glass ? 0.0 : metal, 0.01) * uSunCol * uSunE * ss * (0.6 + 0.4 * ao);
+  }
+  // Dolgu (karşı ışık, Dünya ışığı): gölgesiz, ortam kapatmayla sınırlanır
+  if (uFill.w > 0.0) col += brdf(n, V, uFill.xyz, glass ? vec3(0.0) : alb, rough, F0, glass ? 0.0 : metal, 0.12) * uFillCol * uFill.w * ao;
   // Camın ardı: uzay ve Dünya (kırılma ihmal edilir: aynı pikselin arka planı)
   if (glass && uBackdrop > 0.5) {
     float fr = 0.04 + 0.96 * pow(1.0 - ndv, 5.0);
@@ -936,6 +954,7 @@ uniform vec3 uSunDir;
 uniform float uSpaceL;           // Dünya'nın gündüz yüzünün ışıklılığı [cd/m²]
 uniform float uSpaceT;           // yavaş dönüş için zaman [s]
 uniform float uPreExp;
+uniform vec4 uSunDisc;           // güneş diski: renk × ışıklılık [cd/m²] (w: açık)
 out vec4 oColor;
 // ------------------------------------------------------------------
 // Uzaydan Dünya'ya bakış: analitik küre (geometri yok), işlemsel kıtalar,
@@ -1001,7 +1020,22 @@ vec3 spaceBackdrop(vec3 rd) {
     float day = smoothstep(-0.2, 0.4, dot(n, uSunDir));
     col += vec3(0.3, 0.55, 1.0) * exp(-max(hh, 0.0) * 2.6) * day * 1.1;
   }
-  return col * uSpaceL;
+  col *= uSpaceL;
+  // Güneş: Dünya'nın önünde değilse disk, taç ve geniş hale. Gerçek diskin (0,27°) birkaç katı
+  // çizilir ki görüntüde seçilsin; ışıklılığı doyuma gider, parlama zinciri halesini büyütür.
+  if (uSunDisc.w > 0.5 && !(b > 0.0 && disc > 0.0)) {
+    float c = dot(rd, uSunDir);
+    float ang = acos(clamp(c, -1.0, 1.0));
+    float core = 1.0 - smoothstep(0.012, 0.016, ang);
+    float corona = exp(-ang * 55.0) * 0.22 + exp(-ang * 11.0) * 0.004;
+    // Işın çatalı: ince, dönen dört kol (mercek kırınımı izlenimi)
+    vec3 t1 = normalize(cross(uSunDir, vec3(0.0, 1.0, 0.0)));
+    vec3 t2 = cross(uSunDir, t1);
+    vec2 q2 = vec2(dot(rd, t1), dot(rd, t2));
+    float spikes = (exp(-abs(q2.x) * 300.0) + exp(-abs(q2.y) * 300.0)) * exp(-ang * 26.0) * 0.06 * step(0.0, c);
+    col += uSunDisc.rgb * (core + corona + spikes);
+  }
+  return col;
 }
 
 void main() {

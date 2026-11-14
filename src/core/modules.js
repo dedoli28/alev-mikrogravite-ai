@@ -14,5 +14,6 @@ import '../fx/shaders.js';
 import '../fx/system.js';
 import '../fx/render.js';
 import '../fx/governor.js';
+import '../render/lighting.js';
 import '../render/renderer.js';
 import '../data/presets.js';

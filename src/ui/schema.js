@@ -269,14 +269,21 @@ FL.UI_TABS = [
       {
         id: 'scene', title: 'Sahne',
         items: [
+          { key: 'lightStyle', type: 'list', label: 'Işık tarzı (L)', effect: 'live', options: () => FL.LIGHT_STYLES.map((m) => ({ value: m.id, label: m.name, desc: m.desc })) },
+          { key: 'lightGain', type: 'range', label: 'Işık şiddeti', min: 0.1, max: 3, step: 0.05, unit: '×', digits: 3, effect: 'live', when: (s) => !FL.lightClassic(s),
+            help: 'Seçili ışık tarzının bütün ışıklarını (ortam, lamba, güneş, dolgu) birlikte ölçekler. Alevin kendi ışığı etkilenmez: düşük değerde alev sahneyi daha çok aydınlatır.' },
+          { key: 'sunAz', type: 'range', label: 'Güneş yönü', min: 0, max: 355, step: 5, unit: '°', digits: 3, effect: 'live', when: (s) => FL.lightHasSun(s),
+            help: 'Güneşin azimutu, yukarıdan bakışta: 0° = +x, 90° = +z (kameraya doğru). Gölgeler, kabin camlarından giren ışık, gökyüzündeki güneş diski ve Dünya’nın gündüz/gece sınırı birlikte döner.' },
+          { key: 'sunEl', type: 'range', label: 'Güneş yüksekliği', min: 2, max: 88, step: 1, unit: '°', digits: 3, effect: 'live', when: (s) => FL.lightHasSun(s),
+            help: 'Düşük açı: uzun gölgeler ve yandan gelen ışık. Yüksek açı: tepeden, kısa gölgeler.' },
           {
-            key: 'ambientLight', type: 'seg', label: 'Oda ışığı', effect: 'live',
+            key: 'ambientLight', type: 'seg', label: 'Oda ışığı', effect: 'live', when: (s) => FL.lightClassic(s),
             options: () => [{ value: 0.6, label: 'Karanlık' }, { value: 4, label: 'Loş' }, { value: 20, label: 'Aydınlık' }],
             match: (v, o) => Math.abs(v - o) < 1e-6,
           },
-          { key: 'roomLight', type: 'range', label: 'Tavan lambası', min: 0, max: 1500, step: 10, unit: 'lx', digits: 4, effect: 'live', fmt: (v) => (v > 0 ? fmt(v, 4) : 'kapalı'),
+          { key: 'roomLight', type: 'range', label: 'Tavan lambası', min: 0, max: 1500, step: 10, unit: 'lx', digits: 4, effect: 'live', when: (s) => FL.lightClassic(s), fmt: (v) => (v > 0 ? fmt(v, 4) : 'kapalı'),
             help: 'Sahnenin üstünde boyutlu bir LED lamba (≈4000 K). Değer, lambanın döşemede verdiği aydınlıktır: ofis ≈ 300–500 lx, uzay aracı kabini ≈ 100–500 lx. Model ve masa gölgesini bu ışık da düşürür. Kabin modelinde lamba orta güverte tavan aydınlatmasının yerindedir. Mumun yanında: 1 cd’lik alev 10 cm’de yalnız ≈ 100 lx verir.' },
-          { key: 'ambientLight', id: 'ambientLightFine', type: 'range', label: 'Ortam aydınlığı', min: 0, max: 40, step: 0.1, unit: 'cd/m²', digits: 2, effect: 'live', adv: true },
+          { key: 'ambientLight', id: 'ambientLightFine', type: 'range', label: 'Ortam aydınlığı', min: 0, max: 40, step: 0.1, unit: 'cd/m²', digits: 2, effect: 'live', adv: true, when: (s) => FL.lightClassic(s) },
           {
             key: 'backdrop', type: 'seg', label: 'Arka plan (B)', effect: 'live',
             options: () => [{ value: 'auto', label: 'Otomatik' }, { value: 'lab', label: 'Deney odası' }, { value: 'orbit', label: 'Yörünge' }],
@@ -284,7 +291,7 @@ FL.UI_TABS = [
           },
           { key: 'earthLum', type: 'range', label: 'Dünya parlaklığı', min: 0, max: 3000, step: 10, unit: 'cd/m²', digits: 4, effect: 'live', when: (s) => s.backdrop !== 'lab', adv: true,
             help: 'Güneş alan Dünya’nın gerçek ışıklılığı ≈ 5–10 bin cd/m²’dir: 1 g mum aleviyle aynı mertebe, mikrogravitenin sönük mavi alevinden yüz kat parlak. Varsayılan değer alev görünsün diye kısılmıştır (koyu cam filtre gibi).' },
-          { key: 'sunLight', type: 'range', label: 'Güneş ışığı', min: 0, max: 5000, step: 50, unit: 'lx', digits: 4, effect: 'live', when: (s) => s.backdrop !== 'lab', adv: true, fmt: (v) => (v > 0 ? fmt(v, 4) : 'kapalı'),
+          { key: 'sunLight', type: 'range', label: 'Güneş ışığı', min: 0, max: 5000, step: 50, unit: 'lx', digits: 4, effect: 'live', when: (s) => s.backdrop !== 'lab' && FL.lightClassic(s), adv: true, fmt: (v) => (v > 0 ? fmt(v, 4) : 'kapalı'),
             help: 'Yörünge arka planında model yüzeylerine gelen paralel güneş ışığı (modelin kendi gölgesiyle). Gerçek değer ≈ 130 bin lx’tir; kabin içi aydınlatmayla birlikte pozlanabilsin diye kısılmıştır.' },
           { key: 'floor', type: 'toggle', label: 'Masa yüzeyi', effect: 'live' },
           { key: 'floorGrid', type: 'toggle', label: '1 cm ızgara', effect: 'live', when: (s) => s.floor },

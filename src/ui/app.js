@@ -761,6 +761,16 @@ function toggleAI() {
   toast(on ? (FL.AI.ready ? 'Yapay zekâ tahmini: bir parçaya tıklayın' : 'Yapay zekâ modeli yükleniyor…') : 'Gerçekçi görünüm');
 }
 
+/** Işık tarzı: kendi güneş yüksekliği olan tarz (gün doğumu) kaydırıcıyı da oraya çeker */
+function setLightStyle(id) {
+  const s = FL.LIGHT_STYLES.find((x) => x.id === id) || FL.LIGHT_STYLES[0];
+  if (s.sunEl != null) app.state.sunEl = s.sunEl;
+  else if (app.state.sunEl < 20 && s.sunState) app.state.sunEl = FL.DEFAULTS.sunEl;
+  onControl('lightStyle', s.id, 'live', false);
+  syncRail();
+  toast('Işık: ' + (s.id === 'auto' ? 'Otomatik · ' + FL.lightStyleOfState(app.state).name : s.name));
+}
+
 function setFxTool(id) {
   const st = app.state;
   st.fxTool = FX_TOOLS.some((x) => x.id === id) ? id : 'none';
@@ -1140,6 +1150,13 @@ function flyItems(kind) {
         })),
     };
   }
+  if (kind === 'light') {
+    const cur = FL.lightStyleOfState(st);
+    return {
+      title: 'Işık tarzı',
+      items: FL.LIGHT_STYLES.map((m) => ({ id: m.id, name: m.name + (m.id === 'auto' ? ' · ' + cur.name : ''), desc: m.desc, on: (st.lightStyle || 'auto') === m.id })),
+    };
+  }
   if (kind === 'tool') {
     return {
       title: 'Yangın ve patlama',
@@ -1163,6 +1180,8 @@ function applyFly(kind, id) {
       app.inspector.sync();
       scheduleHash();
     }
+  } else if (kind === 'light') {
+    setLightStyle(id);
   } else if (kind === 'tool') {
     if (id.startsWith('act-')) fxAction(id);
     else {
@@ -1236,6 +1255,7 @@ function syncRail() {
   set('railGravityCap', g >= 0.995 && g <= 1.005 ? '1 g' : g < 1e-3 ? '0 g' : fmt(g, 2) + ' g');
   $('railGravity').setAttribute('aria-pressed', g < 0.05 ? 'true' : 'false');
   set('railViewCap', RAIL_VIEW_SHORT[st.view] || 'Görünüm');
+  set('railLightCap', (st.lightStyle || 'auto') === 'auto' ? 'Işık' : FL.lightStyleOfState(st).name);
   const md = FL.modelById(st.model);
   set('railModelCap', md ? md.short : 'Nesneler');
   const tl = FX_TOOLS.find((x) => x.id === st.fxTool);
@@ -1861,6 +1881,10 @@ function bindKeys() {
     else if (k === 'Escape' && app.state.fxTool !== 'none') setFxTool('none');
     else if (lk === 'y') setFlam(!app.state.flamView);
     else if (lk === 'a') toggleAI();
+    else if (lk === 'l') {
+      const ids = FL.LIGHT_STYLES.map((m) => m.id);
+      setLightStyle(ids[(ids.indexOf(app.state.lightStyle || 'auto') + 1) % ids.length]);
+    }
     else if (k === '?') openDialog('dlgKeys');
     else return;
     e.preventDefault();

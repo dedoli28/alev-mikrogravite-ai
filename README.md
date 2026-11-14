@@ -82,6 +82,7 @@ Tarayıcı gereksinimi: kayan noktalı render hedefleri olan WebGL2 (`EXT_color_
 | `B` | Arka plan: deney odası ↔ yörünge (Dünya ve yıldızlar) |
 | `Y` | Yanıcılık modülü |
 | `A` | Yapay zekâ tahmini (görünüm + panel) |
+| `L` | Işık tarzını değiştir |
 | `P` | Ekran görüntüsü |
 | `?` | Kısayol listesi |
 
@@ -217,6 +218,26 @@ Nesne yangını (alev, duman, kızgın yüzey) artık on görünümün hepsinde 
 - **Işınımla sıçrama:** yanan hücreler kümelere toplanır ve çevredeki yüzeyleri q″ = χ·Q̇/(4πr²) ile ısıtır; alev dolaptan uyku tulumuna, kâğıda, kumaşa atlar. Sıcak gaz katmanı da henüz yanmayan yüzeyleri ısıtır.
 - **Oksijen:** tükenme hızı ayarlanabilir (**O₂ tükenme hızı**, 1 = fiziksel, varsayılan 0,3; 0 = yaşam desteği karşılar). Yangın büyüdükçe O₂ düşer ve alev yakıt bitmeden söner.
 - **Basınç tahliye vanası:** yangının ısıttığı gazın yavaş basınç artışı dışarı atılır; gövdeyi yalnız patlamanın ani aşırı basıncı yırtar.
+
+## Işık tarzları
+
+Sol panelde **Işık** (`L` sırayla değiştirir) ya da **Görüntü › Sahne › Işık tarzı**. Bir tarz dört ışığı birlikte kurar: renkli yarım küre ortam ışığı, konumlu lamba (yumuşak gölge), gölgeli paralel güneş ve gölgesiz dolgu. Alevin kendi ışığı her tarzda ayrıca eklenir.
+
+| Tarz | Görünüm |
+| --- | --- |
+| Otomatik | Mekikte *Yörünge güneşi*, masa üstü nesnelerde *Stüdyo*, yalnız alev deneyinde *Klasik* (alev loş odada kalır) |
+| Yörünge güneşi | Sert, sıcak beyaz güneş ve gölgeleri; alttan mavi Dünya ışığı; gökyüzünde güneş diski ve halesi |
+| Gün doğumu | Ufka yakın turuncu güneş, uzun gölgeler, mor-mavi gölge tonları |
+| Stüdyo | Üç nokta: sıcak ana ışık, soğuk dolgu, arkadan kenar ışığı |
+| Kabin LED | Soğuk beyaz kabin aydınlatması, güneş yok |
+| Acil durum | Kısık kırmızı aydınlatma: alev ve duman öne çıkar |
+| Gece yüzü | Yalnız soluk mavi ışık ve alev |
+| Yalnız alev | Bütün ışıklar kapalı |
+| Klasik (elle) | Eski davranış: beyaz oda ışığı, tavan lambası / ortam / güneş kaydırıcıları |
+
+- **Güneş yönü** ve **Güneş yüksekliği** gölgeleri, kabin camlarından giren ışığı, gökyüzündeki güneş diskini ve Dünya'nın gündüz/gece sınırını birlikte döndürür. Güneşin gölgesi modelin uzaklık alanında yürür; camlar ışığı geçirir.
+- **Işık şiddeti** tarzın bütün ışıklarını ölçekler; alevin ışığı etkilenmez.
+- Tanımlar `src/render/lighting.js` içindedir; yeni tarz eklemek bir kayıt eklemektir.
 
 ## Kıvılcım, ısı ve parçalanma
 
