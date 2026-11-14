@@ -594,9 +594,9 @@ function fxUpdateHud() {
 /** Araçlar: sahnede tıklanan noktaya kıvılcım, patlayıcı ya da söndürücü */
 const FX_TOOLS = [
   { id: 'none', name: 'Kapalı', short: 'Araç', desc: 'Tıklama yalnız görünümü döndürür' },
-  { id: 'spark', name: 'Kıvılcım', short: 'Kıvılcım', desc: 'Tıklanan noktada elektrik arkı: yakıt + ısı + oksitleyici varsa tutuşur' },
+  { id: 'spark', name: 'Kıvılcım', short: 'Kıvılcım', paint: true, desc: 'Sol tuşu basılı tutup sürükleyin: imlecin geçtiği yerde elektrik arkı. Yakıt + ısı + oksitleyici varsa tutuşur; metal kızarır' },
   { id: 'charge', name: 'Patlayıcı', short: 'Patlayıcı', desc: 'Tıklanan noktada patlama (enerji: Deney › Yangın ve patlama)' },
-  { id: 'agent', name: 'Söndürücü', short: 'Söndürücü', desc: 'Tıklanan noktaya CO₂: oksijeni yerinden eder ve soğutur' },
+  { id: 'agent', name: 'Söndürücü', short: 'Söndürücü', paint: true, desc: 'Sol tuşu basılı tutup sürükleyin: imlecin geçtiği yere CO₂. Oksijeni yerinden eder ve soğutur' },
 ];
 const FX_ACTIONS = [
   { id: 'act-short', name: 'Senaryo: kısa devre', desc: 'En yanıcı parçada (kablo, hortum, kumaş) ark çıkar' },
@@ -629,9 +629,18 @@ function fxPoint(cx, cy) {
   return { p: [r.ro[0] + r.rd[0] * (t - back), r.ro[1] + r.rd[1] * (t - back), r.ro[2] + r.rd[2] * (t - back)], body };
 }
 
-function fxApplyTool(tool, hit) {
+/** quiet: basılı tutarken yinelenen uygulama (günlük, yapay zekâ işareti ve uyarı yazılmaz) */
+function fxApplyTool(tool, hit, quiet) {
   const fx = app.fx, st = app.state;
   if (!hit) return;
+  if (quiet) {
+    fx.setEnv(st);
+    const c = hit.body ? hit.body.compartment : fx.compartmentAt(hit.p);
+    if (tool === 'spark') fx.ignite(hit.p, { compartment: c });
+    else if (tool === 'agent') fx.extinguish(hit.p, { compartment: c });
+    app.renderer.warming = Math.max(app.renderer.warming, 30);
+    return;
+  }
   // Ortam (O₂, basınç, havalandırma) en güncel haliyle değerlendirilsin
   fx.setEnv(st);
   const comp = hit.body ? hit.body.compartment : fx.compartmentAt(hit.p);
@@ -1156,7 +1165,11 @@ function applyFly(kind, id) {
     }
   } else if (kind === 'tool') {
     if (id.startsWith('act-')) fxAction(id);
-    else { setFxTool(id); if (id !== 'none') toast(FX_TOOLS.find((x) => x.id === id).name + ': sahnede bir noktaya tıklayın'); }
+    else {
+      setFxTool(id);
+      const tl = FX_TOOLS.find((x) => x.id === id);
+      if (id !== 'none') toast(tl.name + (tl.paint ? ': sol tuşu basılı tutup sürükleyin · döndürmek için Alt + sürükle' : ': sahnede bir noktaya tıklayın'));
+    }
   } else {
     onControl('view', id, 'live', false);
   }
@@ -1554,7 +1567,13 @@ function bindStage() {
     const st = app.state;
     if (pts.size === 1) {
       const panBtn = e.button === 2 || e.button === 1 || e.shiftKey;
-      if (st.camPhys && st.camLook) {
+      const tool = FX_TOOLS.find((x) => x.id === st.fxTool);
+      if (tool && tool.paint && e.button === 0 && !e.shiftKey && !e.altKey) {
+        // Kıvılcım / söndürücü: sol tuş basılıyken imlecin geçtiği yere uygulanır.
+        // Görünümü döndürmek için Alt + sürükle, kaydırmak için sağ tuş ya da ⇧ + sürükle.
+        mode = 'fxPaint';
+        fxPaintStart(e.clientX, e.clientY, tool.id);
+      } else if (st.camPhys && st.camLook) {
         // Kameradan bakarken fare sahne kamerasını yönetir (Blender: kamerayı görünüme kilitle)
         mode = panBtn ? 'camPan' : 'camRot';
       } else {
@@ -1576,7 +1595,8 @@ function bindStage() {
     const dx = e.clientX - p.x, dy = e.clientY - p.y;
     p.x = e.clientX; p.y = e.clientY;
     const st = app.state;
-    if (mode === 'rotate') cam().drag(dx, dy);
+    if (mode === 'fxPaint') fxPaintMove(e.clientX, e.clientY);
+    else if (mode === 'rotate') cam().drag(dx, dy);
     else if (mode === 'pan') cam().pan(dx, dy, canvas.clientHeight);
     else if (mode === 'camRot') {
       camV.yaw -= dx * 0.15;
@@ -1649,8 +1669,34 @@ function bindStage() {
   const end = (e) => {
     pts.delete(e.pointerId);
     if (pts.size === 1 && mode === 'pinch') { mode = 'rotate'; }
-    if (pts.size === 0) { mode = null; stage.classList.remove('dragging', 'panning'); app.gizmoDrag = null; if (app.overlay) app.overlay.active = null; }
+    if (pts.size === 0) { mode = null; fxPaintEnd(); stage.classList.remove('dragging', 'panning'); app.gizmoDrag = null; if (app.overlay) app.overlay.active = null; }
   };
+  // Basılı tutarak uygulama: ilk dokunuş günlüğe yazar; sonra imleç ~6 px ilerledikçe ya da
+  // yerinde dururken saniyede ~8 kez yinelenir (aynı noktada ısı birikir)
+  let paint = null;
+  const fxPaintAt = (quiet) => {
+    const rc = canvas.getBoundingClientRect();
+    fxApplyTool(paint.tool, fxPoint(paint.x - rc.left, paint.y - rc.top), quiet);
+    paint.ax = paint.x; paint.ay = paint.y; paint.at = performance.now();
+  };
+  function fxPaintStart(x, y, tool) {
+    fxPaintEnd();
+    paint = { tool, x, y, ax: x, ay: y, at: 0, timer: 0 };
+    app.fxPainted = true;
+    fxPaintAt(false);
+    paint.timer = setInterval(() => { if (paint && !app.paused && performance.now() - paint.at > 115) fxPaintAt(true); }, 60);
+  }
+  function fxPaintMove(x, y) {
+    if (!paint) return;
+    paint.x = x; paint.y = y;
+    if (Math.hypot(x - paint.ax, y - paint.ay) >= 6 && performance.now() - paint.at > 35) fxPaintAt(true);
+  }
+  function fxPaintEnd() {
+    if (!paint) return;
+    clearInterval(paint.timer);
+    paint = null;
+  }
+  window.addEventListener('blur', fxPaintEnd);
   canvas.addEventListener('pointerup', end);
   canvas.addEventListener('pointercancel', end);
   canvas.addEventListener('wheel', (e) => {
@@ -1690,6 +1736,10 @@ function bindStage() {
   canvas.addEventListener('pointerup', (e) => {
     const d = down;
     down = null;
+    // Basılı tutarak uygulanan araç (kıvılcım, söndürücü) zaten uygulandı
+    const painted = app.fxPainted;
+    app.fxPainted = false;
+    if (painted) return;
     if (!d || d.b !== 0 || d.sh) return;
     if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > 4) return;
     // Yangın aracı seçiliyse tıklama onu uygular (sürükleme yine görünümü döndürür)

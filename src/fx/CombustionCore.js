@@ -335,10 +335,13 @@ export class CombustionCore {
         const myBody = body[i];
         for (let k = nbrStart[i], end = nbrStart[i + 1]; k < end; k++) {
           const j = nbrIndex[k];
-          if (body[j] !== myBody || state[j] === CELL_DEAD || state[j] === CELL_BURNING) continue;
+          if (state[j] === CELL_DEAD || state[j] === CELL_BURNING) continue;
+          const other = body[j] !== myBody;
+          if (other && (bodyDetached[myBody] || bodyDetached[body[j]])) continue;
           const diff = T - temp[j];
           if (diff > 0) {
-            const f = diff * kdt;
+            // Değme yüzeyi sınırlı: komşu parçaya iletim, parçanın kendi içindekinin yarısı
+            const f = diff * kdt * (other ? 0.5 : 1);
             temp[j] += f;
             T -= f;
           }
@@ -347,7 +350,8 @@ export class CombustionCore {
 
       // Convection needs gas: in vacuum only radiation is left, so things stay hot longer.
       const pAtm = Math.min(1, comp.pressure / 101.325);
-      T += (ambient - T) * Math.min(1, dt * mat.coolRate * rateScale[i] * (0.2 + 0.8 * pAtm));
+      const hold = fuel[i] > 0 ? 1 : 1 / Math.sqrt(Math.max(1, mat.thermalInertia));
+      T += (ambient - T) * Math.min(1, dt * mat.coolRate * rateScale[i] * hold * (0.2 + 0.8 * pAtm));
       temp[i] = T;
 
       if (st === CELL_VIRGIN && fuel[i] > 0 && suppress[i] <= 0) {
@@ -357,7 +361,7 @@ export class CombustionCore {
           // flame then survives depends on how well oxidizer keeps reaching it.
           let ambientOx = effectiveOxygen(comp.o2Fraction, comp.pressure, 1);
           if (mat.selfOxidizing) ambientOx = Math.max(ambientOx, 0.21);
-          if (ambientOx >= mat.loi) {
+          if (ambientOx >= mat.loi * 0.93) {
             state[i] = CELL_BURNING;
             intensity[i] = 0.05;
             // Lit by a neighbouring flame, the gas here is already partly used up.

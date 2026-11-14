@@ -494,7 +494,7 @@ class Renderer {
     const ms = this.model;
     let floorFade = gr.Lx * 1.8;
     // Yanık izi hacmi (model uzayı): G-tamponu geçişi örnekler
-    if (fxs && fxs.partsDirty) { fxs.partsDirty = false; ms._paintParts(); }
+    if (fxs && fxs.partsDirty) { fxs.partsDirty = false; ms._paintParts(); ms.refreshSDF(); }
     this.fx.syncBurn(mOn ? fxs : null, ms);
     if (mOn) {
       ms.place(st, gr);

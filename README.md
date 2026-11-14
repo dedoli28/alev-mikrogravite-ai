@@ -149,7 +149,7 @@ Akış çözücüsündeki alevin (mum, jet, damla, levha) yanına ikinci bir yan
 
 **Kullanım**
 - **Nesneler** (sol panel, `M`): her model ayrı bir sahne nesnesidir; liste açık kalır, istediğiniz kadarını birlikte ekleyip çıkarabilirsiniz (yan yana dizilirler). Mekik kabini diğer dördünü içinde taşıdığı için tek başınadır: kabin seçiliyken öteki nesneler kilitlidir. Sahnede herhangi bir nesne varken deney düzeneği (mum, jet, damla, levha) olmaz: nesne eklenince düzenek, boş deney kutusu ve ölçüleri kaldırılır; **Kaynak** listesi nesneler kaldırılana kadar kilitlidir. Bir senaryo yüklemek nesneleri kaldırıp düzeneği geri getirir.
-- **Yangın** (sol panel, `N`): tıklama aracı seçin (*Kıvılcım*, *Patlayıcı*, *Söndürücü*) ve sahnede bir noktaya tıklayın; sürükleme görünümü döndürmeye devam eder, `Esc` aracı kapatır. Hazır senaryolar: *kısa devre*, *tüp yanında yangın*, *patlama* (`X`), *gövde delinmesi* (kabin). Neyin neden tutuştuğu ya da tutuşmadığı sol alttaki günlükte yazar; üstteki çip yangın gücünü, yanan alanı ve kabin atmosferini gösterir. `R` her şeyi (parçalar, kabin havası) geri getirir.
+- **Yangın** (sol panel, `N`): araç seçin. *Kıvılcım* ve *Söndürücü* sol tuş basılı tutulup sürüklenerek uygulanır: imlecin geçtiği yerde ark çakar, aynı noktada tutulursa ısı birikir (metal kızarır, is lekesi kalır). Bu araçlar seçiliyken görünüm `Alt` + sürükleyerek döner, sağ tuş ya da `⇧` + sürükleyerek kayar. *Patlayıcı* tek tıklamadır. `Esc` aracı kapatır. Hazır senaryolar: *kısa devre*, *tüp yanında yangın*, *patlama* (`X`), *gövde delinmesi* (kabin). Neyin neden tutuştuğu ya da tutuşmadığı sol alttaki günlükte yazar; üstteki çip yangın gücünü, yanan alanı ve kabin atmosferini gösterir. `R` her şeyi (parçalar, kabin havası) geri getirir.
 - Patlayıcı enerjisi ve O₂ bağlantısı: **Deney › Yangın ve patlama**.
 - **Uzaydan Dünya'ya bakış** (`B`, **Görüntü › Sahne › Arka plan**): kıtalar, bulutlar, gündüz/gece sınırı, atmosfer halesi ve yıldızlar; kabin camlarından da görünür. *Otomatik* kipte kabin modelinde ve mikrogravitede açılır.
 
@@ -217,6 +217,12 @@ Nesne yangını (alev, duman, kızgın yüzey) artık on görünümün hepsinde 
 - **Işınımla sıçrama:** yanan hücreler kümelere toplanır ve çevredeki yüzeyleri q″ = χ·Q̇/(4πr²) ile ısıtır; alev dolaptan uyku tulumuna, kâğıda, kumaşa atlar. Sıcak gaz katmanı da henüz yanmayan yüzeyleri ısıtır.
 - **Oksijen:** tükenme hızı ayarlanabilir (**O₂ tükenme hızı**, 1 = fiziksel, varsayılan 0,3; 0 = yaşam desteği karşılar). Yangın büyüdükçe O₂ düşer ve alev yakıt bitmeden söner.
 - **Basınç tahliye vanası:** yangının ısıttığı gazın yavaş basınç artışı dışarı atılır; gövdeyi yalnız patlamanın ani aşırı basıncı yırtar.
+
+## Kıvılcım, ısı ve parçalanma
+
+- Tutuşma ve alevin sürmesi aynı oksijen sınırını kullanır (etkin O₂ ≥ 0,93·LOI): masa üstündeki nesnelerin plastik ve kauçuk parçaları (hortum, huni, vana kolu, klipsler) havada kıvılcımla tutuşur. Çelik, alüminyum, pirinç ve PTFE yanmaz; kıvılcım onları ısıtır ve isler.
+- Yanmaz yüzeyler ısıl kütleleri oranında daha geç soğur; ısı, birbirine değen parçalar arasında da iletilir.
+- Basınçlı kap yarılınca ona bağlı küçük parçalar (valf, tetik, hortum, huni, kelepçe, braket) onunla birlikte kopar. Parçalanan parçalar uzaklık alanından da çıkarılır: gölgeleri ve ortam karartmaları kalmaz. `R` hepsini geri getirir.
 
 ## Modelin sınırları
 

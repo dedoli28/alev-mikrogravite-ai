@@ -328,7 +328,21 @@ class ModelScene {
   }
 
   /** Model uzayında SDF: en uzun kenar ~150 voksel, 3 voksel kenar payı */
-  async _buildSDF(token, prog) {
+  /**
+   * Parçalanan (ya da geri gelen) parçalardan sonra uzaklık alanını yeniler: patlayan tüp gölge
+   * düşürmeye ve ortamı karartmaya devam etmesin. Izgara aynı kalır; hesap karelere yayılır.
+   */
+  refreshSDF() {
+    if (!this.ready) return;
+    clearTimeout(this._sdfTimer);
+    const token = this._token;
+    const seq = (this._sdfSeq = (this._sdfSeq || 0) + 1);
+    this._sdfTimer = setTimeout(() => {
+      this._buildSDF(token, () => {}, () => this._sdfSeq === seq).catch((e) => console.error(e));
+    }, 90);
+  }
+
+  async _buildSDF(token, prog, still) {
     // Cam ve ince saydam olmayan her şey gölge düşürür. Burun gibi "sdf: false" parçalar ızgaraya girmez:
     // ızgara yalnız kabin hacmini kaplar, böylece burun kabin içi gölge çözünürlüğünü düşürmez.
     const parts = this.parts.filter((p) => !p.glass && !p.noSdf);
@@ -341,8 +355,10 @@ class ModelScene {
     const n = ext.map((e) => Math.max(4, Math.ceil(e / d) + 7));
     const o = [0, 1, 2].map((c) => 0.5 * (slo[c] + shi[c]) - 0.5 * (n[c] - 1) * d);
     const grid = { o, d, n };
-    const dist = await FL.voxelSDF(parts, grid, { cap: SDF_CAP, progress: prog, alive: () => this._token === token });
-    if (!dist || this._token !== token) return;
+    // Izgara bütün parçalardan (yerleşim değişmesin), uzaklıklar yalnız duranlardan
+    const solid = parts.filter((p) => !p.destroyed);
+    const dist = await FL.voxelSDF(solid, grid, { cap: SDF_CAP, progress: prog, alive: () => this._token === token && (!still || still()) });
+    if (!dist || this._token !== token || (still && !still())) return;
     const data = new Uint8Array(dist.length);
     for (let q = 0; q < dist.length; q++) data[q] = Math.max(0, Math.min(255, Math.round((dist[q] / SDF_CAP * 0.5 + 0.5) * 255)));
     if (this.sdfTex) this.gl.deleteTexture(this.sdfTex.handle);

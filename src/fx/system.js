@@ -390,7 +390,7 @@ class FxSystem {
         localRadius: 0.5 * Math.hypot(p.hi[0] - p.lo[0], p.hi[1] - p.lo[1], p.hi[2] - p.lo[2]),
         // Patlama yüküne dayanım (MJ/m²): basınçlı kaplar kalın cidarlıdır, komşu bir patlama onları kolayca yarmaz
         toughness: structural ? Infinity : explosive ? 9 : isCombustible(mat) ? 1.6 : 5,
-        explosive, destroyed: false, triggered: false, cookTime: 0,
+        explosive, destroyed: false, triggered: false, cookTime: 0, structural,
         color: p.alb ? p.alb.slice(0, 3) : [0.5, 0.5, 0.5],
         everBurned: false,
       };
@@ -579,7 +579,7 @@ class FxSystem {
     const transport = oxygenTransport(this.gNorm, speed);
     const ambient = effectiveOxygen(comp.o2Fraction, comp.pressure, 1);
     const sustained = effectiveOxygen(comp.o2Fraction, comp.pressure, transport);
-    return { canIgnite: ambient >= mat.loi, canSustain: sustained >= mat.loi * 0.93, transport, effectiveOxygen: sustained, ambient };
+    return { canIgnite: ambient >= mat.loi * 0.93, canSustain: sustained >= mat.loi * 0.93, transport, effectiveOxygen: sustained, ambient };
   }
 
   describeIgnition(body) {
@@ -626,6 +626,10 @@ class FxSystem {
       }
     }
     this.fire.spawn(t, KIND_GLOW, p[0], p[1], p[2], 0, 0, 0, 0, 0, 0, 0, 0.22, 0.12 * ss, 0.3 * ss, 3100, 0.9, 0, 0);
+    // Ark yüzeyde is lekesi bırakır (yanmaz metalde de): kıvılcımın değdiği yer görünür
+    this.core.scorchSphere(p[0], p[1], p[2], radius * 0.8, 0.42);
+    this.burnVersion++;
+    this._burnLive = true;
     return this.core.heatSphere(p[0], p[1], p[2], radius, opts.heat ?? 1150, true);
   }
 
@@ -815,7 +819,11 @@ class FxSystem {
       const center = body.center.slice();
       if (spec.o2Release) comp.addGas(spec.o2Release, 0);
       if (spec.inertRelease) comp.addGas(0, spec.inertRelease);
-      this.shatter(body, center, 5 + 3 * Math.cbrt(spec.yield ?? 1));
+      const speed = 5 + 3 * Math.cbrt(spec.yield ?? 1);
+      // Kaba bağlı parçalar (valf, tetik, hortum, huni, kelepçe) onunla birlikte kopar:
+      // tüp yarılınca ucundaki hortum ve huni havada asılı kalmaz
+      for (const part of this.attachedBodies(body)) this.shatter(part, center, speed * 0.7);
+      this.shatter(body, center, speed);
       this.explode(center, Object.assign({}, spec, { compartment: comp, source: body }));
       const pct = '%' + (comp.o2Fraction * 100).toFixed(1).replace('.', ',');
       if (spec.kind === 'co2') {
@@ -832,6 +840,36 @@ class FxSystem {
     };
     if (delay > 0) this.schedule(delay, go);
     else go();
+  }
+
+  /**
+   * Bir gövdeye (basınçlı kap) doğrudan ya da zincirleme değen küçük parçalar: sınır kutuları
+   * birkaç milimetre payla kesişenler. Taşıyıcı yapı (kabuk, döşeme, büyük paneller) ve kaptan
+   * uzağa uzanan parçalar (uzun borular) sayılmaz.
+   */
+  attachedBodies(root) {
+    const out = [];
+    const obj = root.part.obj;
+    const M = 0.006;
+    const touch = (a, b) => {
+      for (let k = 0; k < 3; k++) if (a.lo[k] - M > b.hi[k] || b.lo[k] - M > a.hi[k]) return false;
+      return true;
+    };
+    const rc = root.localCenter, reach = root.localRadius * 1.7;
+    const pool = this.bodies.filter((b) => b !== root && !b.destroyed && !b.structural && !b.explosive && b.part.obj === obj && b.compartment === root.compartment &&
+      b.localRadius <= root.localRadius * 1.25 &&
+      Math.hypot(b.localCenter[0] - rc[0], b.localCenter[1] - rc[1], b.localCenter[2] - rc[2]) <= reach + 0.5 * b.localRadius);
+    const taken = new Set();
+    let frontier = [root];
+    for (let depth = 0; depth < 4 && frontier.length; depth++) {
+      const next = [];
+      for (const b of pool) {
+        if (taken.has(b)) continue;
+        if (frontier.some((f) => touch(f.part, b.part))) { taken.add(b); next.push(b); out.push(b); }
+      }
+      frontier = next;
+    }
+    return out;
   }
 
   /** Parçalanma: parça gizlenir, yerine origin'den uzağa uçan enkaz gelir */
