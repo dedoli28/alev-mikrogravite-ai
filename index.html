@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#1c1c1e" />
+    <meta name="description" content="Gerçek zamanlı 3B yanma simülatörü: mum, gaz jeti, yakıt damlası ve katı levha alevlerini Dünya, Ay, Mars ve mikrogravite koşullarında karşılaştırın." />
+    <title>Mikrogravite Alev Laboratuvarı</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  </head>
+  <body>
+    <div class="app no-insp" id="app">
+      <header class="toolbar" aria-label="Simülasyon araç çubuğu">
+        <div class="tb-left">
+          <button type="button" class="scn-btn" id="scnBtn" aria-haspopup="dialog" data-tip="Senaryo seç (O)">
+            <span class="scn-btn-title">Senaryolar</span>
+            <span class="scn-btn-sub"><span id="scnLabel">—</span><svg class="scn-chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5L6 7.5 9 4.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          </button>
+          <div class="dims" id="dims" role="group" aria-label="Hesaplama alanının boyutu" data-tip="Hesaplama alanının boyutu (cm). Alev kutudan taşıyorsa büyütün; alan yeniden kurulur. Hücre boyu X ve çözünürlükten gelir.">
+            <label class="dim"><span class="dim-k">X</span><input id="dimX" class="dim-in" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Genişlik X (cm)"></label>
+            <label class="dim"><span class="dim-k">Y</span><input id="dimY" class="dim-in" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Yükseklik Y (cm)"></label>
+            <label class="dim"><span class="dim-k">Z</span><input id="dimZ" class="dim-in" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Derinlik Z (cm)"></label>
+            <span class="dim-u">cm</span>
+          </div>
+        </div>
+
+        <div class="tb-center">
+          <div class="tb-group">
+            <button type="button" class="tb-icon" id="btnPause" aria-label="Duraklat" data-tip="Duraklat / sürdür (Boşluk)"></button>
+            <button type="button" class="tb-icon" id="btnStep" data-icon="step" aria-label="Tek kare ilerlet" data-tip="Tek kare ilerlet (.)" disabled></button>
+            <button type="button" class="tb-icon" id="btnReset" data-icon="reset" aria-label="Alanı sıfırla" data-tip="Alanı sıfırla (R)"></button>
+          </div>
+          <div class="timecode" aria-label="Benzetim zamanı">
+            <span class="tc-main" id="tcTime">0,000</span><span class="tc-unit">s</span>
+            <span class="tc-sub" id="tcRate" data-tip="Benzetim hızı / gerçek zaman · kare hızı">×1,00</span>
+          </div>
+        </div>
+
+        <div class="tb-right">
+          <div class="status" id="status" data-state="none"><i class="status-dot"></i><span id="statusTxt">Hazırlanıyor</span></div>
+          <span class="tb-sep tb-sep-r" aria-hidden="true"></span>
+          <button type="button" class="tb-icon" id="btnShot" data-icon="camera" aria-label="Ekran görüntüsü kaydet" data-tip="Ekran görüntüsü kaydet (P)"></button>
+          <button type="button" class="tb-icon" id="btnShare" data-icon="link" aria-label="Paylaşım bağlantısını kopyala" data-tip="Bu deneyin bağlantısını kopyala"></button>
+          <button type="button" class="tb-icon" id="btnKeys" data-icon="keyboard" aria-label="Klavye kısayolları" data-tip="Klavye kısayolları (?)"></button>
+          <button type="button" class="tb-icon" id="btnCine" data-icon="film" aria-label="Sinematik mod" aria-pressed="false" data-tip="Sinematik mod (K): arayüzü gizler, yalnız alev kalır. Çıkmak için K veya Esc"></button>
+          <button type="button" class="tb-icon" id="btnInspector" data-icon="sidebar" aria-label="Ayrıntılı ayarları göster veya gizle" aria-pressed="false" data-tip="Ayrıntılı ayarlar (H)"></button>
+        </div>
+      </header>
+
+      <main class="stage" id="stage" aria-label="3B alev görüntüsü">
+        <canvas id="gl" aria-label="Hacimsel alev görüntüsü" tabindex="0"></canvas>
+        <canvas id="overlay" aria-hidden="true"></canvas>
+
+        <div class="legend glass" id="legend" aria-live="off"></div>
+
+        <nav class="rail" id="rail" aria-label="Temel denetimler">
+          <div class="rail-group">
+            <button type="button" class="rail-btn rail-ignite" id="btnIgnite" data-icon="flame" data-tip="Tutuşturucuyu çalıştır (I)" data-tip-side="right"><span class="rail-cap">Ateşle</span></button>
+            <button type="button" class="rail-btn rail-suppress" id="btnSuppress" data-icon="extinguish" data-tip="Üfleyerek söndür (S): alevin üzerine hızlı inert gaz jeti. Basılı tuttukça sürer." data-tip-side="right"><span class="rail-cap">Söndür</span></button>
+            <button type="button" class="rail-btn rail-smother" id="btnSmother" data-icon="tank" data-tip="CO₂ tüpü (T): alevi oksijenden kopararak boğar. Basılı tuttukça boşalır." data-tip-side="right"><span class="rail-cap">CO₂</span></button>
+          </div>
+          <div class="rail-group">
+            <button type="button" class="rail-btn" id="railSource" data-icon="drop" data-fly="source" aria-haspopup="menu" aria-expanded="false" data-tip="Yanan kaynak" data-tip-side="right"><span class="rail-cap" id="railSourceCap">Kaynak</span></button>
+            <button type="button" class="rail-btn" id="railPlace" data-icon="planet" data-fly="place" aria-haspopup="menu" aria-expanded="false" data-tip="Konum: yerçekimi, basınç ve atmosferi birlikte kurar" data-tip-side="right"><span class="rail-cap" id="railPlaceCap">Konum</span></button>
+            <button type="button" class="rail-btn" id="railGravity" data-icon="gravity" aria-pressed="false" data-tip="Yerçekimi 0 g ↔ 1 g (G)" data-tip-side="right"><span class="rail-cap" id="railGravityCap">1 g</span></button>
+            <button type="button" class="rail-btn" id="railView" data-icon="layers" data-fly="view" aria-haspopup="menu" aria-expanded="false" data-tip="Görünüm modu (1–9)" data-tip-side="right"><span class="rail-cap" id="railViewCap">Görünüm</span></button>
+          </div>
+          <div class="rail-group">
+            <button type="button" class="rail-btn" id="railModel" data-icon="cube" data-fly="model" aria-haspopup="menu" aria-expanded="false" data-tip="Sahne nesneleri: söndürücü, oksijen üreteci, O₂ vanası, kablo demeti, mekik kabini. Her biri ayrı eklenir (M)" data-tip-side="right"><span class="rail-cap" id="railModelCap">Nesneler</span></button>
+            <button type="button" class="rail-btn rail-fx" id="railTool" data-icon="spark" data-fly="tool" aria-haspopup="menu" aria-expanded="false" data-tip="Yangın ve patlama: kıvılcım, patlayıcı, söndürücü araçları ve hazır senaryolar (N)" data-tip-side="right"><span class="rail-cap" id="railToolCap">Yangın</span></button>
+            <button type="button" class="rail-btn" id="railFlam" data-icon="hazard" aria-pressed="false" data-tip="Yanıcılık: modelin parçalarını yanıcılık sınıfına ya da bu atmosferdeki durumuna göre renklendirir (Y)" data-tip-side="right"><span class="rail-cap">Yanıcılık</span></button>
+            <button type="button" class="rail-btn rail-ai" id="railAI" data-icon="ai" aria-pressed="false" data-tip="Yapay zekâ tahmini (A): kokpit yangın modeli parçaların tutuşma riskini ve alevin nasıl yayılacağını öngörür" data-tip-side="right"><span class="rail-cap">Yapay zekâ</span></button>
+          </div>
+          <div class="rail-group">
+            <button type="button" class="rail-btn" id="railChart" data-icon="chart" aria-pressed="false" data-tip="Zaman serisi grafiği (C)" data-tip-side="right"><span class="rail-cap">Grafik</span></button>
+            <button type="button" class="rail-btn" id="railSettings" data-icon="sliders" aria-pressed="false" data-tip="Ayrıntılı ayarlar (H)" data-tip-side="right"><span class="rail-cap">Ayarlar</span></button>
+          </div>
+        </nav>
+        <div class="flyout" id="flyout" role="menu" hidden></div>
+
+
+        <div class="cam-tools glass" role="group" aria-label="Kamera">
+          <button type="button" class="ct-btn" id="camFit" data-icon="fit" aria-label="Görünümü sığdır" data-tip="Sığdır (F · çift tık)"></button>
+          <span class="ct-sep" aria-hidden="true"></span>
+          <button type="button" class="ct-btn" id="camFront" data-icon="front" aria-label="Önden bak" data-tip="Önden"></button>
+          <button type="button" class="ct-btn" id="camSide" data-icon="side" aria-label="Yandan bak" data-tip="Yandan"></button>
+          <button type="button" class="ct-btn" id="camTop" data-icon="top" aria-label="Üstten bak" data-tip="Üstten"></button>
+          <span class="ct-sep" aria-hidden="true"></span>
+          <button type="button" class="ct-btn" id="camOrbit" data-icon="orbit" aria-label="Otomatik dönüş" aria-pressed="false" data-tip="Otomatik dönüş"></button>
+        </div>
+
+        <div class="hud-bottom">
+          <div class="readouts glass" id="readouts" aria-label="Ölçümler"></div>
+          <section class="chart glass" id="chart" aria-label="Zaman serisi">
+            <header class="chart-head">
+              <div class="chart-seg"></div>
+              <button type="button" class="ct-btn ct-sm" id="chartHide" data-icon="minus" aria-label="Grafiği gizle" data-tip="Grafiği gizle (C)"></button>
+            </header>
+            <div class="chart-sub"><span class="chart-name"></span><span class="chart-val">—</span></div>
+            <canvas aria-label="Zaman serisi grafiği"></canvas>
+            <footer class="chart-foot"><span class="chart-foot-l"></span><span class="chart-foot-r"></span></footer>
+          </section>
+          <button type="button" class="chart-fab glass" id="chartShow" data-icon="chart" hidden data-tip="Grafiği göster (C)"><span>Grafik</span></button>
+        </div>
+
+        <div class="coach glass" id="coach" hidden>
+          <span><kbd>Sürükle</kbd> döndür</span>
+          <span><kbd>⇧</kbd> + sürükle kaydır</span>
+          <span><kbd>Tekerlek</kbd> yakınlaştır</span>
+          <span><kbd>Çift tık</kbd> sığdır</span>
+          <button type="button" class="ct-btn ct-sm" id="coachClose" data-icon="close" aria-label="İpucunu kapat"></button>
+        </div>
+
+        <div class="fx-chip glass" id="fxChip" role="status" aria-label="Yangın durumu" hidden></div>
+        <div class="fx-log" id="fxLog" aria-live="off" hidden></div>
+        <section class="flam glass" id="flam" aria-label="Yanıcılık" hidden></section>
+        <section class="flam glass ai-panel" id="aiPanel" aria-label="Yapay zekâ tahmini" hidden></section>
+        <div class="flam-tip" id="flamTip" role="tooltip" hidden></div>
+        <div class="model-load glass" id="modelLoad" role="status" hidden><span id="modelLoadTxt">Model yükleniyor</span><i><b id="modelLoadBar"></b></i></div>
+        <div class="toast glass" id="toast" role="status" hidden></div>
+
+        <div class="boot" id="loading" role="status" aria-live="polite">
+          <div class="boot-card">
+            <div class="boot-title">Mikrogravite Alev Laboratuvarı</div>
+            <div class="boot-sub">Gerçek zamanlı yanma simülatörü</div>
+            <div class="boot-bar" aria-hidden="true"><i id="bootBar"></i></div>
+            <div class="boot-step"><span id="bootStep">Başlatılıyor</span><span id="bootPct">%0</span></div>
+          </div>
+          <div class="boot-foot">WebGL2 · GPU üzerinde akış, kimya ve ışınım çözücüsü</div>
+        </div>
+
+        <div class="fatal" id="fatal" hidden>
+          <div class="fatal-card">
+            <div class="fatal-ico" data-icon="warning"></div>
+            <h2 id="fatalTitle">WebGL2 başlatılamadı</h2>
+            <p id="fatalText">Bu simülatör, kayan noktalı render hedefleri olan bir WebGL2 grafik işlemcisi gerektirir (EXT_color_buffer_float). Masaüstü Chrome, Edge, Safari 17+ veya Firefox'un güncel sürümünü deneyin.</p>
+            <pre id="fatalDetail"></pre>
+            <button type="button" class="btn btn-primary" id="fatalReload">Yeniden yükle</button>
+          </div>
+        </div>
+      </main>
+
+      <div class="split" id="split" role="separator" aria-orientation="vertical" aria-label="Denetçi genişliği" tabindex="0"></div>
+      <aside class="inspector" id="inspector" aria-label="Ayrıntılı ayarlar">
+        <button type="button" class="sheet-grab" id="sheetGrab" aria-label="Denetçiyi aç veya kapat"><i></i></button>
+        <div class="insp-root" id="inspRoot"></div>
+      </aside>
+    </div>
+
+    <dialog class="dlg dlg-scn" id="dlgScenarios" aria-labelledby="dlgScnTitle">
+      <div class="dlg-head">
+        <h2 id="dlgScnTitle">Deney senaryoları</h2>
+        <button type="button" class="ct-btn" data-close data-icon="close" aria-label="Kapat"></button>
+      </div>
+      <div class="search">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M15 15l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <input type="search" id="scnSearch" placeholder="Ara: mum, damla, 0 g, Saffire, Mars…" autocomplete="off" aria-label="Senaryo ara" />
+      </div>
+      <div class="scn-list" id="scnList" role="listbox" aria-label="Senaryolar"></div>
+    </dialog>
+
+    <dialog class="dlg dlg-keys" id="dlgKeys" aria-labelledby="dlgKeysTitle">
+      <div class="dlg-head">
+        <h2 id="dlgKeysTitle">Klavye kısayolları</h2>
+        <button type="button" class="ct-btn" data-close data-icon="close" aria-label="Kapat"></button>
+      </div>
+      <div class="keys">
+        <section>
+          <h3>Deney</h3>
+          <dl>
+            <dt><kbd>I</kbd></dt><dd>Ateşle</dd>
+            <dt><kbd>S</kbd></dt><dd>Üfleyerek söndür (tıkla veya basılı tut)</dd>
+            <dt><kbd>T</kbd></dt><dd>CO₂ tüpü: oksijeni keserek boğ (tıkla veya basılı tut)</dd>
+            <dt><kbd>Boşluk</kbd></dt><dd>Duraklat / sürdür</dd>
+            <dt><kbd>.</kbd></dt><dd>Tek kare ilerlet</dd>
+            <dt><kbd>R</kbd></dt><dd>Alanı sıfırla</dd>
+            <dt><kbd>G</kbd></dt><dd>0 g ↔ 1 g</dd>
+            <dt><kbd>O</kbd></dt><dd>Senaryolar</dd>
+          </dl>
+        </section>
+        <section>
+          <h3>Görüntü</h3>
+          <dl>
+            <dt><kbd>1</kbd>–<kbd>9</kbd></dt><dd>Görünüm modu</dd>
+            <dt><kbd>V</kbd></dt><dd>Sonraki görünüm</dd>
+            <dt><kbd>F</kbd></dt><dd>Görünümü sığdır</dd>
+            <dt><kbd>0</kbd></dt><dd>Kameradan bak / editör görünümü (fiziksel kamera)</dd>
+            <dt><kbd>W</kbd> <kbd>E</kbd> <kbd>Q</kbd></dt><dd>Kamera aracı: taşı / döndür / ölçekle (görüş açısı)</dd>
+            <dt><kbd>C</kbd></dt><dd>Grafiği göster / gizle</dd>
+            <dt><kbd>H</kbd></dt><dd>Ayrıntılı ayarları göster / gizle</dd>
+            <dt><kbd>K</kbd></dt><dd>Sinematik mod: yalnız alev, arayüz yok</dd>
+            <dt><kbd>D</kbd></dt><dd>GPU geçiş profili (Çözücü sekmesi)</dd>
+            <dt><kbd>M</kbd></dt><dd>Sahne nesneleri (her biri ayrı eklenir / çıkarılır)</dd>
+            <dt><kbd>N</kbd></dt><dd>Yangın ve patlama araçları, senaryolar</dd>
+            <dt><kbd>X</kbd></dt><dd>Patlama (seçili enerjide)</dd>
+            <dt><kbd>B</kbd></dt><dd>Arka plan: deney odası ↔ yörünge (Dünya)</dd>
+            <dt><kbd>Y</kbd></dt><dd>Yanıcılık modülü (parçaya tıkla: ayrıntı)</dd>
+            <dt><kbd>A</kbd></dt><dd>Yapay zekâ tahmini (parçaya tıkla: tahmin)</dd>
+            <dt><kbd>P</kbd></dt><dd>Ekran görüntüsü</dd>
+            <dt><kbd>?</kbd></dt><dd>Bu pencere</dd>
+          </dl>
+        </section>
+        <section>
+          <h3>Fare ve dokunma</h3>
+          <dl>
+            <dt>Sürükle</dt><dd>Döndür</dd>
+            <dt><kbd>⇧</kbd> / sağ tuş</dt><dd>Kaydır</dd>
+            <dt>Tekerlek · iki parmak</dt><dd>Yakınlaştır</dd>
+            <dt>Çift tık</dt><dd>Sığdır</dd>
+            <dt>Etikete çift tık</dt><dd>Varsayılana döndür</dd>
+          </dl>
+        </section>
+      </div>
+    </dialog>
+
+    <div class="sr-only" id="live" aria-live="polite"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

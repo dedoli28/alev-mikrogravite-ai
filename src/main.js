@@ -1,0 +1,11 @@
+import './styles/fonts.css';
+import './styles/app.css';
+import './core/modules.js';
+import './ui/icons.js';
+import './ui/schema.js';
+import './ui/inspector.js';
+import './ui/hud.js';
+import './ui/dataset.js';
+import './ui/flammability.js';
+import './ai/model.js';
+import './ui/app.js';

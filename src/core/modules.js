@@ -1,0 +1,18 @@
+/* Çekirdek modüller: sıra önemlidir (her biri FL ad alanına ekler) */
+import './fl.js';
+import '../physics/thermo.js';
+import '../gl/gl.js';
+import '../shaders/common.js';
+import '../shaders/physics.js';
+import '../shaders/render.js';
+import '../sim/simulation.js';
+import '../models/glb.js';
+import '../models/library.js';
+import '../models/voxel.js';
+import '../models/scene.js';
+import '../fx/shaders.js';
+import '../fx/system.js';
+import '../fx/render.js';
+import '../fx/governor.js';
+import '../render/renderer.js';
+import '../data/presets.js';
